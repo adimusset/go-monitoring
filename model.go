@@ -1,29 +1,55 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
+//the log
 type Object struct {
 	Date        time.Time
 	RequestLine string
 }
 
-func (o Object) Section() Section {
-	return Section(o.RequestLine)
+//thread safe sortable storage
+type Storage struct {
+	lock    sync.Mutex
+	indexes map[string]int
+	counts  Counts
 }
 
-type Section string
-
-func (s Section) String() string {
-	return string(s)
+func NewStorage() *Storage {
+	return &Storage{
+		lock:    sync.Mutex{},
+		indexes: make(map[string]int),
+		counts:  make(Counts, 0),
+	}
 }
 
-type Printable interface {
-	String() string
+func (s *Storage) Add(v string) {
+	s.lock.Lock()
+	i, ok := s.indexes[v]
+	if !ok {
+		s.counts = append(s.counts, Count{0, v})
+		s.indexes[v] = len(s.counts) - 1
+		i = len(s.counts) - 1
+	}
+	s.counts[i].n = s.counts[i].n + 1
+	s.lock.Unlock()
+}
+
+func (s *Storage) GetCounts() Counts {
+	s.lock.Lock()
+	counts := s.counts
+	s.indexes = make(map[string]int)
+	s.counts = Counts{}
+	s.lock.Unlock()
+	return counts
 }
 
 type Count struct {
 	n     int
-	value Printable // or just a string ?
+	value string // could be more complicated
 }
 
 type Counts []Count
@@ -38,14 +64,4 @@ func (c Counts) Less(i, j int) bool {
 
 func (c Counts) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
-}
-
-func (c Counts) add(value Printable) {
-	for k, old := range c {
-		if old.value.String() == value.String() {
-			c[k] = Count{old.n + 1, value}
-			return
-		}
-	}
-	c = append(c, Count{1, value})
 }

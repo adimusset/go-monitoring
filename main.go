@@ -5,28 +5,33 @@ import (
 )
 
 func main() {
-	input := make(chan Object, 100)
+	input := make(chan Object)
 	go logTest(input)
 
-	puller := make(chan bool)
-	stats := make(chan Statistics)
+	requests := NewStorage()
+
+	alerts := make(chan Alert)
 
 	consumer := NewConsumer(input)
-	console := NewConsole(puller, stats)
-	statsReporter := NewStatisticsReporter(puller, stats)
+	console := NewConsole(requests, alerts)
+	statsReporter := NewStatisticsReporter(requests)
+	averageAlerter := NewAverageAlerter(10, alerts)
 
 	consumer.Subscribe(statsReporter)
+	consumer.Subscribe(averageAlerter)
 
 	go consumer.Consume()
-	go statsReporter.Consume()
-	go statsReporter.Serve()
 
 	console.Run()
 }
 
 func logTest(output chan Object) {
-	for {
+	for k := 0; k < 10; k++ {
 		time.Sleep(2 * time.Second)
 		output <- Object{RequestLine: "/section"}
+	}
+	for {
+		time.Sleep(time.Second)
+		output <- Object{RequestLine: "/new"}
 	}
 }

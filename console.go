@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -10,45 +12,61 @@ const refreshingTimeInSeconds = 3
 
 var layout, _ = template.New("console").Parse(`
 {{.Time}}
-Most visited section: {{.Section}}
+Most visited section: {{.Section}} : {{.Times}} times
+Last alerts: {{.Alerts}}
 ------`)
 
-func printOutput(t, section string) error {
+func printOutput(t, section string, times int, alerts string) error {
 	input := struct {
 		Time    string
 		Section string
+		Times   string
+		Alerts  string
 	}{
 		Time:    t,
 		Section: section,
+		Times:   fmt.Sprintf("%d", times),
+		Alerts:  alerts,
 	}
 	return layout.Execute(os.Stdout, input)
 }
 
 type Console struct {
-	refresher   *time.Ticker
-	statsPuller chan bool
-	stats       chan Statistics
+	refresher    *time.Ticker
+	requests     *Storage
+	alerts       chan Alert
+	recentAlerts []Alert
 }
 
-func NewConsole(puller chan bool, stats chan Statistics) *Console {
+func NewConsole(requests *Storage, alerts chan Alert) *Console {
 	t := time.NewTicker(time.Duration(refreshingTimeInSeconds) * time.Second)
 	return &Console{
-		refresher:   t,
-		statsPuller: puller,
-		stats:       stats,
+		refresher:    t,
+		requests:     requests,
+		alerts:       alerts,
+		recentAlerts: []Alert{},
 	}
 }
 
 func (c *Console) Run() {
+	go c.WatchAlerts()
 	for range c.refresher.C {
-		c.statsPuller <- true
-		stats := <-c.stats
+		counts := c.requests.GetCounts()
+		sort.Sort(counts)
+		// need to add intelligence
+
 		t := time.Now().Format("15:04:05")
-		if len(stats.Sections) == 0 {
-			printOutput(t, "none")
+		if len(counts) == 0 {
+			printOutput(t, "none", 0, "")
 			continue
 		}
-		section := stats.Sections[0].value.String()
-		printOutput(t, section)
+		printOutput(t, counts[0].value, counts[0].n, "")
+	}
+}
+
+func (c *Console) WatchAlerts() {
+	for alert := range c.alerts {
+		fmt.Println(alert)
+		c.recentAlerts = append(c.recentAlerts, alert)
 	}
 }
