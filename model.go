@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -9,6 +11,9 @@ import (
 type Object struct {
 	Date        time.Time
 	RequestLine string
+	IP          string
+	StatusCode  int
+	Size        int
 }
 
 //thread safe sortable storage
@@ -64,4 +69,14 @@ func (c Counts) Less(i, j int) bool {
 
 func (c Counts) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
+}
+
+var sectionRegex, _ = regexp.Compile(".*?/(.+?)/.*")
+
+func getSection(requestLine string) (string, error) {
+	submatches := sectionRegex.FindStringSubmatch(requestLine)
+	if len(submatches) < 2 {
+		return "", fmt.Errorf("Could not get the section")
+	}
+	return submatches[1], nil
 }
