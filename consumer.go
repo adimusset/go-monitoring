@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -36,11 +37,14 @@ type Reporter interface {
 type StatisticsReporter struct {
 	input    chan Object
 	requests *Storage
+	sections *Storage
 }
 
-func NewStatisticsReporter(requests *Storage) *StatisticsReporter {
+func NewStatisticsReporter(requests *Storage,
+	sections *Storage) *StatisticsReporter {
 	return &StatisticsReporter{
 		requests: requests,
+		sections: sections,
 		input:    make(chan Object),
 	}
 }
@@ -49,20 +53,27 @@ func (r *StatisticsReporter) Input() chan Object {
 	return r.input
 }
 
-func (r *StatisticsReporter) Consume() { //this could in several routines
+func (r *StatisticsReporter) Consume() { //this could be several routines
 	for object := range r.input {
 		r.requests.Add(object.RequestLine)
+		section, err := getSection(object.RequestLine)
+		if err != nil {
+			fmt.Println("Error parsing section, ", object.RequestLine)
+			continue
+		}
+		r.sections.Add(section)
 	}
 }
 
-//only for 2 minutess atm
+//not thread safe
 type AverageAlerter struct {
-	input       chan Object
-	maxAverage  int
-	output      chan Alert
-	objects     []Object //only the time is important
-	refresher   *time.Ticker
-	overAverage bool
+	input             chan Object
+	maxAverage        int
+	durationInSeconds int
+	output            chan Alert
+	objects           []Object //only the time is important
+	refresher         *time.Ticker
+	overAverage       bool
 }
 
 type Alert struct {
@@ -71,7 +82,16 @@ type Alert struct {
 	Up      bool
 }
 
-func NewAverageAlerter(max int, output chan Alert) *AverageAlerter {
+func (a Alert) String() string {
+	date := a.Date.Local().Format("02.01.06 15:04:05")
+	if a.Up {
+		return fmt.Sprintf("%s above %d", date, a.Average)
+	}
+	return fmt.Sprintf("%s below %d", date, a.Average)
+}
+
+func NewAverageAlerter(max, durationInSeconds int,
+	output chan Alert) *AverageAlerter {
 	t := time.NewTicker(time.Second)
 	return &AverageAlerter{
 		maxAverage:  max,
@@ -96,24 +116,36 @@ func (a *AverageAlerter) Consume() {
 
 func (a *AverageAlerter) Run() {
 	for range a.refresher.C {
-		i := 0
-		for k, o := range a.objects {
-			if o.Date.After(time.Now().Add(-2 * time.Minute)) {
-				i = k
-				break
-			}
-		}
-		if i != 0 {
-			a.objects = a.objects[i-1:]
-		}
-		m := len(a.objects)
-		if m > a.maxAverage && !a.overAverage {
-			a.output <- Alert{time.Now(), a.maxAverage, true}
-			a.overAverage = true
-		}
-		if m < a.maxAverage && a.overAverage {
-			a.output <- Alert{time.Now(), a.maxAverage, false}
-			a.overAverage = false
+		objects, overAverage, alert := nextState(time.Now(), a.objects, a.overAverage,
+			a.maxAverage, a.durationInSeconds)
+		a.objects = objects
+		a.overAverage = overAverage
+		if alert != nil {
+			a.output <- *alert
 		}
 	}
+}
+
+func nextState(now time.Time, objects []Object, overAverage bool, maxAverage,
+	durationInSeconds int) ([]Object, bool, *Alert) {
+	i := 0
+	//we suppose that the array is sorted for the date (we could also sort it)
+	for k, o := range objects {
+		if o.Date.After(now.Add(time.Duration(-durationInSeconds) * time.Second)) {
+			i = k
+			break
+		}
+	}
+	objects = objects[i:]
+	m := len(objects) //raw count, could be a moving average
+	var alert *Alert
+	if m > maxAverage && !overAverage {
+		alert = &Alert{now, maxAverage, true}
+		overAverage = true
+	}
+	if m < maxAverage && overAverage {
+		alert = &Alert{now, maxAverage, false}
+		overAverage = false
+	}
+	return objects, overAverage, alert
 }
