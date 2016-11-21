@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+//conf
+const (
+	consoleRefreshingTime = 10
+	alertDuration         = 120
+	alertMax              = 50
+)
+
 func main() {
 	input := make(chan Object, 100)
 	go logTest(input)
@@ -18,9 +25,9 @@ func start(input chan Object) {
 	alerts := make(chan Alert)
 
 	consumer := NewConsumer(input)
-	console := NewConsole(requests, sections, alerts)
+	console := NewConsole(requests, sections, alerts, consoleRefreshingTime)
 	statsReporter := NewStatisticsReporter(requests, sections)
-	averageAlerter := NewAverageAlerter(10, 15, alerts)
+	averageAlerter := NewAverageAlerter(alertMax, alertDuration, alerts)
 
 	consumer.Subscribe(statsReporter)
 	consumer.Subscribe(averageAlerter)

@@ -11,10 +11,7 @@ import (
 const infoRequest = "request"
 const infoSection = "section"
 
-const refreshingTimeInSeconds = 10
-
-var layout, _ = template.New("console").Parse(`
-{{.Time}}
+var layout, _ = template.New("console").Parse(`{{.Time}}
 Most visited section: {{.Section}} - {{.TimesSection}}
 Most done request: {{.Request}} - {{.TimesRequest}}{{if .Alerts}}
 Recent alerts: {{.Alerts}}{{end}}
@@ -49,14 +46,16 @@ func printOutput(t time.Time, infos map[string]Counts, alerts []Alert) error {
 }
 
 type Console struct {
-	refresher    *time.Ticker
+	refresher *time.Ticker
+
 	alerts       chan Alert
 	recentAlerts []Alert
 	requests     *Storage //could add more
 	sections     *Storage
 }
 
-func NewConsole(requests *Storage, sections *Storage, alerts chan Alert) *Console {
+func NewConsole(requests *Storage, sections *Storage, alerts chan Alert,
+	refreshingTimeInSeconds int) *Console {
 	t := time.NewTicker(time.Duration(refreshingTimeInSeconds) * time.Second)
 	return &Console{
 		refresher:    t,
@@ -104,7 +103,7 @@ func (c *Console) WatchAlerts() {
 		}
 		fmt.Println(s)
 
-		c.recentAlerts = append(c.recentAlerts, alert)
+		c.recentAlerts = append(c.recentAlerts, alert) //could remove old ones
 	}
 }
 

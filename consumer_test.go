@@ -15,20 +15,16 @@ func TestNextStateUp(t *testing.T) {
 		Object{Date: now.Add(-119 * time.Second)},
 		Object{Date: now.Add(-90 * time.Second)},
 	}
-	newObjects, overAverage, alert := nextState(now, objects, false, 3, 120)
-	expectedObjects := []Object{
-		Object{Date: now.Add(-119 * time.Second)},
-		Object{Date: now.Add(-90 * time.Second)},
-	}
+	i, overAverage, alert := nextState(now, objects, false, 3, 120)
 	assert.Nil(t, alert)
 	assert.False(t, overAverage)
-	assert.Equal(t, expectedObjects, newObjects)
+	assert.Equal(t, 2, i)
 
-	newObjects, overAverage, alert = nextState(now, objects, false, 3, 180)
+	i, overAverage, alert = nextState(now, objects, false, 3, 180)
 	expectedAlert := &Alert{Date: now, Average: 3, Up: true}
 	assert.Equal(t, expectedAlert, alert)
 	assert.True(t, overAverage)
-	assert.Equal(t, objects, newObjects)
+	assert.Equal(t, 0, i)
 }
 
 func TestNextStateDown(t *testing.T) {
@@ -39,19 +35,15 @@ func TestNextStateDown(t *testing.T) {
 		Object{Date: now.Add(-119 * time.Second)},
 		Object{Date: now.Add(-90 * time.Second)},
 	}
-	newObjects, overAverage, alert := nextState(now, objects, true, 3, 180)
+	i, overAverage, alert := nextState(now, objects, true, 3, 180)
 
 	assert.Nil(t, alert)
 	assert.True(t, overAverage)
-	assert.Equal(t, objects, newObjects)
+	assert.Equal(t, 0, i)
 
-	newObjects, overAverage, alert = nextState(now, objects, true, 3, 120)
-	expectedObjects := []Object{
-		Object{Date: now.Add(-119 * time.Second)},
-		Object{Date: now.Add(-90 * time.Second)},
-	}
+	i, overAverage, alert = nextState(now, objects, true, 3, 120)
 	expectedAlert := &Alert{Date: now, Average: 3, Up: false}
 	assert.Equal(t, expectedAlert, alert)
 	assert.False(t, overAverage)
-	assert.Equal(t, expectedObjects, newObjects)
+	assert.Equal(t, 2, i)
 }

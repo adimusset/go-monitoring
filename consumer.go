@@ -53,7 +53,7 @@ func (r *StatisticsReporter) Input() chan Object {
 	return r.input
 }
 
-func (r *StatisticsReporter) Consume() { //this could be several routines
+func (r *StatisticsReporter) Consume() {
 	for object := range r.input {
 		r.requests.Add(object.RequestLine)
 		section, err := getSection(object.RequestLine)
@@ -65,14 +65,13 @@ func (r *StatisticsReporter) Consume() { //this could be several routines
 	}
 }
 
-//not thread safe
 type AverageAlerter struct {
+	refresher         *time.Ticker
 	input             chan Object
 	maxAverage        int
 	durationInSeconds int
 	output            chan Alert
 	objects           []Object //only the time is important
-	refresher         *time.Ticker
 	overAverage       bool
 }
 
@@ -94,12 +93,13 @@ func NewAverageAlerter(max, durationInSeconds int,
 	output chan Alert) *AverageAlerter {
 	t := time.NewTicker(time.Second)
 	return &AverageAlerter{
-		maxAverage:  max,
-		output:      output,
-		input:       make(chan Object),
-		overAverage: false,
-		objects:     []Object{},
-		refresher:   t,
+		maxAverage:        max,
+		output:            output,
+		input:             make(chan Object),
+		overAverage:       false,
+		objects:           []Object{},
+		refresher:         t,
+		durationInSeconds: durationInSeconds,
 	}
 }
 
@@ -116,9 +116,9 @@ func (a *AverageAlerter) Consume() {
 
 func (a *AverageAlerter) Run() {
 	for range a.refresher.C {
-		objects, overAverage, alert := nextState(time.Now(), a.objects, a.overAverage,
+		i, overAverage, alert := nextState(time.Now(), a.objects, a.overAverage,
 			a.maxAverage, a.durationInSeconds)
-		a.objects = objects
+		a.objects = a.objects[i:]
 		a.overAverage = overAverage
 		if alert != nil {
 			a.output <- *alert
@@ -127,11 +127,11 @@ func (a *AverageAlerter) Run() {
 }
 
 func nextState(now time.Time, objects []Object, overAverage bool, maxAverage,
-	durationInSeconds int) ([]Object, bool, *Alert) {
+	durationInSeconds int) (int, bool, *Alert) {
 	i := 0
 	//we suppose that the array is sorted for the date (we could also sort it)
 	for k, o := range objects {
-		if o.Date.After(now.Add(time.Duration(-durationInSeconds) * time.Second)) {
+		if now.Sub(o.Date) < time.Duration(durationInSeconds)*time.Second {
 			i = k
 			break
 		}
@@ -147,5 +147,5 @@ func nextState(now time.Time, objects []Object, overAverage bool, maxAverage,
 		alert = &Alert{now, maxAverage, false}
 		overAverage = false
 	}
-	return objects, overAverage, alert
+	return i, overAverage, alert
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-//the log
 type Object struct {
 	Date        time.Time
 	RequestLine string
@@ -64,7 +63,7 @@ func (c Counts) Len() int {
 }
 
 func (c Counts) Less(i, j int) bool {
-	return c[i].n < c[j].n
+	return c[i].n > c[j].n
 }
 
 func (c Counts) Swap(i, j int) {
