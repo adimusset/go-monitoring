@@ -1,24 +1,47 @@
 package main
 
 import (
-	"time"
+	"fmt"
+	"os"
+	"strconv"
 )
 
 //conf
 const (
 	consoleRefreshingTime = 10
 	alertDuration         = 120
-	alertMax              = 50
 )
 
 func main() {
-	input := make(chan Object, 100)
-	go logTest(input)
+	args := os.Args
+	if len(args) != 3 {
+		fmt.Println("Please give 2 arguments, not ", len(args))
+		return
+	}
+	t, err := strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Println("Please give an integer threshold - ", err.Error())
+		return
+	}
 
-	start(input)
+	logLines := make(chan string)
+
+	reader, err := NewLogReader(args[2], logLines)
+	if err != nil {
+		fmt.Println("Please a working log file - ", err.Error())
+		return
+	}
+
+	logs := make(chan Object)
+	parser := NewLogParser(logLines, logs)
+
+	go reader.Read()
+	go parser.Parse()
+
+	start(logs, t)
 }
 
-func start(input chan Object) {
+func start(input chan Object, t int) {
 	requests := NewStorage()
 	sections := NewStorage()
 
@@ -27,7 +50,7 @@ func start(input chan Object) {
 	consumer := NewConsumer(input)
 	console := NewConsole(requests, sections, alerts, consoleRefreshingTime)
 	statsReporter := NewStatisticsReporter(requests, sections)
-	averageAlerter := NewAverageAlerter(alertMax, alertDuration, alerts)
+	averageAlerter := NewAverageAlerter(t, alertDuration, alerts)
 
 	consumer.Subscribe(statsReporter)
 	consumer.Subscribe(averageAlerter)
@@ -35,19 +58,4 @@ func start(input chan Object) {
 	go consumer.Consume()
 
 	console.Run()
-}
-
-func logTest(output chan Object) {
-	for k := 0; k < 10; k++ {
-		time.Sleep(2 * time.Second)
-		output <- Object{RequestLine: "GET /section/page", Date: time.Now()}
-		output <- Object{RequestLine: "GET /section2/page", Date: time.Now()}
-		output <- Object{RequestLine: "GET /section2/page", Date: time.Now()}
-		output <- Object{RequestLine: "GET /section2/page2", Date: time.Now()}
-	}
-	time.Sleep(30 * time.Second)
-	for {
-		time.Sleep(time.Second)
-		output <- Object{RequestLine: "POST /new/image", Date: time.Now()}
-	}
 }
