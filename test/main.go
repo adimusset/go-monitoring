@@ -13,6 +13,7 @@ func main() {
 		return
 	}
 	f, err := os.Create(args[1])
+	defer f.Close()
 	if err != nil {
 		fmt.Println("Error while creating log file - ", err.Error())
 		return
