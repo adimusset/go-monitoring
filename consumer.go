@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// This object receives the data from the parser(s) and distributes it
+// to all the reporters
 type Consumer struct {
 	input     chan Object
 	reporters []Reporter
@@ -34,6 +36,7 @@ type Reporter interface {
 	Consume()
 }
 
+// This object stores relevant data in shared storages with the console
 type StatisticsReporter struct {
 	input    chan Object
 	requests *Storage
@@ -65,13 +68,16 @@ func (r *StatisticsReporter) Consume() {
 	}
 }
 
+// This object counts how many requests have been done during
+// the last x seconds
+// It generates alerts if a certain limit is gone through
 type AverageAlerter struct {
 	refresher         *time.Ticker
 	input             chan Object
 	maxAverage        int
 	durationInSeconds int
 	output            chan Alert
-	objects           []Object //only the time is important
+	objects           []Object
 	overAverage       bool
 }
 
@@ -137,7 +143,9 @@ func nextState(now time.Time, objects []Object, overAverage bool, maxAverage,
 		}
 	}
 	objects = objects[i:]
-	m := len(objects) //raw count, could be a moving average
+	// You can edit this part depending on how likely you can have peaks
+	// It is a raw count but could a moving average
+	m := len(objects)
 	var alert *Alert
 	if m > maxAverage && !overAverage {
 		alert = &Alert{now, maxAverage, true}

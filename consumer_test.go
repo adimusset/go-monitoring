@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// The nextState method wraps all the alerting logic
+// Having such a pure function permits to write very simple tests
+
 func TestNextStateUp(t *testing.T) {
 	now := time.Date(2016, time.November, 19, 12, 0, 0, 0, time.UTC)
 	objects := []Object{

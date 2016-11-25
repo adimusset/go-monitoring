@@ -45,12 +45,13 @@ func printOutput(t time.Time, infos map[string]Counts, alerts []Alert) error {
 	return nil
 }
 
+//Object writing all the information in the console
+//You can add more shared storages to monitore more things
 type Console struct {
-	refresher *time.Ticker
-
+	refresher    *time.Ticker
 	alerts       chan Alert
 	recentAlerts []Alert
-	requests     *Storage //could add more
+	requests     *Storage
 	sections     *Storage
 }
 
@@ -102,8 +103,9 @@ func (c *Console) WatchAlerts() {
 			s = fmt.Sprintf("Traffic back to normal - hits = %d, triggered at %s", alert.Average, hour)
 		}
 		fmt.Println(s)
-
-		c.recentAlerts = append(c.recentAlerts, alert) //could remove old ones
+		//Here all the alerts are kept since the start of the sofware
+		//You can filter them if you want to
+		c.recentAlerts = append(c.recentAlerts, alert)
 	}
 }
 

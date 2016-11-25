@@ -7,15 +7,16 @@ import (
 	"time"
 )
 
+// Http Log Object
 type Object struct {
 	Date        time.Time
 	RequestLine string
 	IP          string
-	StatusCode  int
-	Size        int
+	StatusCode  string
+	Size        string
 }
 
-//thread safe sortable storage
+// Thread safe sortable storage
 type Storage struct {
 	lock    sync.Mutex
 	indexes map[string]int
@@ -51,9 +52,11 @@ func (s *Storage) GetCounts() Counts {
 	return counts
 }
 
+// The value field could be an interface implementing the String()
+// method and carry more information than just a string
 type Count struct {
 	n     int
-	value string // could be more complicated
+	value string
 }
 
 type Counts []Count
